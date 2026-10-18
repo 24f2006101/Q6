@@ -2,27 +2,27 @@ import os
 import redis.asyncio as redis
 from fastapi import FastAPI, HTTPException
 
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 app = FastAPI()
-r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
-
-
-@app.on_event("startup")
-async def startup():
-    await r.ping()
+r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 
 @app.post("/hit/{key}")
 async def hit(key: str):
-    count = await r.incr(key)
+    try:
+        count = await r.incr(key)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Redis unavailable")
     return {"key": key, "count": count}
 
 
 @app.get("/count/{key}")
 async def count(key: str):
-    count = await r.get(key)
+    try:
+        count = await r.get(key)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Redis unavailable")
     return {"key": key, "count": int(count or 0)}
 
 
